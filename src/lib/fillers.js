@@ -72,3 +72,28 @@ export function fillCheckbox(el, value) {
   if (el.checked !== affirmative) el.click();
   return true;
 }
+
+export function realClick(el) {
+  const win = el.ownerDocument.defaultView;
+  for (const type of ['pointerdown', 'mousedown', 'mouseup', 'click']) {
+    const Ctor = win.MouseEvent || win.Event;
+    el.dispatchEvent(new Ctor(type, { bubbles: true, cancelable: true }));
+  }
+}
+
+export function findOptions(doc) {
+  let opts = Array.from(doc.querySelectorAll('[role="option"]'));
+  if (opts.length === 0) {
+    opts = Array.from(doc.querySelectorAll('[class*="option"], [class*="Option"]'))
+      .filter(o => o.offsetParent !== null || o.getClientRects().length > 0);
+  }
+  return opts;
+}
+
+export async function fillDropdown(controlEl, value, { openAndWait }) {
+  const options = await openAndWait(controlEl);
+  const idx = matchOptionText(options.map(o => o.textContent), value);
+  if (idx === -1) return false;
+  realClick(options[idx]);
+  return true;
+}
