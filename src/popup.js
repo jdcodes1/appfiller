@@ -8,16 +8,25 @@ async function activeTab() {
 
 $('fill').addEventListener('click', async () => {
   const tab = await activeTab();
-  const res = await chrome.tabs.sendMessage(tab.id, { action: 'fillPage' });
-  $('fill').textContent = res ? `Filled ${res.filled}/${res.total}` : 'Fill page';
+  try {
+    const res = await chrome.tabs.sendMessage(tab.id, { action: 'fillPage' });
+    $('fill').textContent = res ? `Filled ${res.filled}/${res.total}` : 'Fill page';
+  } catch (e) {
+    $('fill').textContent = 'Not available here';
+  }
 });
 
 $('teach').addEventListener('click', async () => {
   const tab = await activeTab();
-  teaching = !teaching;
-  await chrome.tabs.sendMessage(tab.id, { action: teaching ? 'startTeach' : 'stopTeach' });
-  $('teach').textContent = teaching ? 'Stop teaching' : 'Teach a field';
-  $('teach').classList.toggle('active', teaching);
+  const nextTeaching = !teaching;
+  try {
+    await chrome.tabs.sendMessage(tab.id, { action: nextTeaching ? 'startTeach' : 'stopTeach' });
+    teaching = nextTeaching;
+    $('teach').textContent = teaching ? 'Stop teaching' : 'Teach a field';
+    $('teach').classList.toggle('active', teaching);
+  } catch (e) {
+    $('teach').textContent = 'Not available here';
+  }
 });
 
 $('opts').addEventListener('click', (e) => { e.preventDefault(); chrome.runtime.openOptionsPage(); });

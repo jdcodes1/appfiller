@@ -14,3 +14,6 @@ Teach-once auto-fill for job-application fields (EEO/diversity + any custom data
 ## Test
 - Unit: `npm test`
 - Manual: open `test/harness.html` in the browser with the extension loaded; teach each field, reload, Fill page. Verify the Race/Ethnicity custom dropdown fills.
+
+## Privacy
+Auto-fill-on-load is opt-in (default off). When enabled, the content script runs on all sites and will automatically fill any field whose label matches a mapping you've taught — enable it knowingly. The manual **Fill page** button, which only fills on your click, is the safe default.

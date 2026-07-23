@@ -37,18 +37,22 @@ export async function fillPage(doc, state, deps = F) {
   let filled = 0;
   const fields = collectFields(doc);
   for (const el of fields) {
-    const fp = fingerprint(el);
-    const valueKey = mappings[fp];
-    if (!valueKey || !(valueKey in values)) continue;
-    const value = values[valueKey];
-    const type = getFieldType(el);
-    let ok = false;
-    if (type === 'text' || type === 'textarea') { deps.setNativeValue(el, value); ok = true; }
-    else if (type === 'select') ok = deps.fillSelect(el, value);
-    else if (type === 'radio') ok = deps.fillRadio(el, value);
-    else if (type === 'checkbox') ok = deps.fillCheckbox(el, value);
-    else if (type === 'dropdown') ok = await deps.fillDropdown(el, value, { openAndWait });
-    if (ok) filled++;
+    try {
+      const fp = fingerprint(el);
+      const valueKey = mappings[fp];
+      if (!valueKey || !(valueKey in values)) continue;
+      const value = values[valueKey];
+      const type = getFieldType(el);
+      let ok = false;
+      if (type === 'text' || type === 'textarea') { deps.setNativeValue(el, value); ok = true; }
+      else if (type === 'select') ok = deps.fillSelect(el, value);
+      else if (type === 'radio') ok = deps.fillRadio(el, value);
+      else if (type === 'checkbox') ok = deps.fillCheckbox(el, value);
+      else if (type === 'dropdown') ok = await deps.fillDropdown(el, value, { openAndWait });
+      if (ok) filled++;
+    } catch (e) {
+      console.warn('[AppFiller] failed to fill field', el, e);
+    }
   }
   return { filled, total: fields.length };
 }
@@ -56,19 +60,28 @@ export async function fillPage(doc, state, deps = F) {
 export function buildTeachPanel(doc, { labelText, valueKeys }) {
   const panel = doc.createElement('div');
   panel.className = 'appfiller-panel';
-  const keyOptions = valueKeys.map(k => `<option value="${k}">${k}</option>`).join('') +
-    `<option value="__new__">Create new…</option>`;
   panel.innerHTML = `
-    <div class="muted">Field: ${labelText || '(no label found)'}</div>
+    <div class="muted">Field: </div>
     <label>What data goes here?</label>
-    <select class="af-key">${keyOptions}</select>
+    <select class="af-key"></select>
     <input class="af-newkey" placeholder="new key (e.g. github)" style="display:none">
     <input class="af-newval" placeholder="value" style="display:none">
     <div class="row">
       <button class="af-save primary">Save & fill</button>
       <button class="af-cancel">Cancel</button>
     </div>`;
+  panel.querySelector('.muted').textContent = `Field: ${labelText || '(no label found)'}`;
   const keySel = panel.querySelector('.af-key');
+  for (const k of valueKeys) {
+    const option = doc.createElement('option');
+    option.value = k;
+    option.textContent = k;
+    keySel.appendChild(option);
+  }
+  const newOption = doc.createElement('option');
+  newOption.value = '__new__';
+  newOption.textContent = 'Create new…';
+  keySel.appendChild(newOption);
   const newKey = panel.querySelector('.af-newkey');
   const newVal = panel.querySelector('.af-newval');
   keySel.addEventListener('change', () => {

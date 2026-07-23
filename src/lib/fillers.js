@@ -38,10 +38,14 @@ export function fillSelect(selectEl, value) {
   return true;
 }
 
+function cssEscape(s) {
+  return (typeof CSS !== 'undefined' && CSS.escape) ? CSS.escape(s) : s;
+}
+
 function radioLabelText(radio) {
   const doc = radio.ownerDocument;
   if (radio.id) {
-    const l = doc.querySelector(`label[for="${radio.id}"]`);
+    const l = doc.querySelector(`label[for="${cssEscape(radio.id)}"]`);
     if (l) return l.textContent.trim();
   }
   const wrap = radio.closest('label');
@@ -56,7 +60,7 @@ function radioLabelText(radio) {
 export function fillRadio(radioEl, value) {
   const name = radioEl.getAttribute('name');
   const scope = name
-    ? radioEl.ownerDocument.querySelectorAll(`input[type="radio"][name="${name}"]`)
+    ? radioEl.ownerDocument.querySelectorAll(`input[type="radio"][name="${cssEscape(name)}"]`)
     : [radioEl];
   const arr = Array.from(scope);
   const idx = matchOptionText(arr.map(radioLabelText), value);

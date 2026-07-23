@@ -32,7 +32,8 @@ export function getLabelText(el) {
   }
 
   if (el.id) {
-    const forLabel = doc.querySelector(`label[for="${el.id}"]`);
+    const safeId = (typeof CSS !== 'undefined' && CSS.escape) ? CSS.escape(el.id) : el.id;
+    const forLabel = doc.querySelector(`label[for="${safeId}"]`);
     if (forLabel) return forLabel.textContent.trim();
   }
 
