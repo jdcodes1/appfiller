@@ -1,4 +1,4 @@
-import { fingerprint, getFieldType } from './lib/fingerprint.js';
+import { fingerprint, getFieldType, getLabelText } from './lib/fingerprint.js';
 import * as F from './lib/fillers.js';
 import { createStore } from './lib/storage.js';
 
@@ -53,6 +53,93 @@ export async function fillPage(doc, state, deps = F) {
   return { filled, total: fields.length };
 }
 
+export function buildTeachPanel(doc, { labelText, valueKeys }) {
+  const panel = doc.createElement('div');
+  panel.className = 'appfiller-panel';
+  const keyOptions = valueKeys.map(k => `<option value="${k}">${k}</option>`).join('') +
+    `<option value="__new__">Create new…</option>`;
+  panel.innerHTML = `
+    <div class="muted">Field: ${labelText || '(no label found)'}</div>
+    <label>What data goes here?</label>
+    <select class="af-key">${keyOptions}</select>
+    <input class="af-newkey" placeholder="new key (e.g. github)" style="display:none">
+    <input class="af-newval" placeholder="value" style="display:none">
+    <div class="row">
+      <button class="af-save primary">Save & fill</button>
+      <button class="af-cancel">Cancel</button>
+    </div>`;
+  const keySel = panel.querySelector('.af-key');
+  const newKey = panel.querySelector('.af-newkey');
+  const newVal = panel.querySelector('.af-newval');
+  keySel.addEventListener('change', () => {
+    const isNew = keySel.value === '__new__';
+    newKey.style.display = isNew ? 'block' : 'none';
+    newVal.style.display = isNew ? 'block' : 'none';
+  });
+  return panel;
+}
+
+export function teachController(doc, store, onTaught) {
+  let current = null;
+  let panel = null;
+
+  const onOver = (e) => {
+    const el = e.target;
+    if (panel && panel.contains(el)) return;
+    el.classList?.add('appfiller-highlight');
+  };
+  const onOut = (e) => { e.target.classList?.remove('appfiller-highlight'); };
+
+  const onClick = async (e) => {
+    const el = e.target;
+    if (panel && panel.contains(el)) return;
+    const field = el.closest('input,textarea,select,[role="combobox"],[aria-haspopup="listbox"],[class*="select__control"]');
+    if (!field) return;
+    e.preventDefault(); e.stopPropagation();
+    current = field;
+    removePanel();
+    const valueKeys = Object.keys(await store.getValues());
+    panel = buildTeachPanel(doc, { labelText: getLabelText(field), valueKeys });
+    const rect = field.getBoundingClientRect();
+    panel.style.top = (rect.bottom + doc.defaultView.scrollY + 4) + 'px';
+    panel.style.left = (rect.left + doc.defaultView.scrollX) + 'px';
+    doc.body.appendChild(panel);
+    panel.querySelector('.af-cancel').addEventListener('click', removePanel);
+    panel.querySelector('.af-save').addEventListener('click', save);
+  };
+
+  async function save() {
+    const keySel = panel.querySelector('.af-key');
+    let valueKey = keySel.value;
+    if (valueKey === '__new__') {
+      valueKey = panel.querySelector('.af-newkey').value.trim();
+      const val = panel.querySelector('.af-newval').value;
+      if (!valueKey) return;
+      await store.setValue(valueKey, val);
+    }
+    await store.setMapping(fingerprint(current), valueKey);
+    const value = (await store.getValues())[valueKey];
+    onTaught?.(current, valueKey, value);
+    removePanel();
+  }
+
+  function removePanel() { if (panel) { panel.remove(); panel = null; } }
+
+  return {
+    start() {
+      doc.addEventListener('mouseover', onOver, true);
+      doc.addEventListener('mouseout', onOut, true);
+      doc.addEventListener('click', onClick, true);
+    },
+    stop() {
+      doc.removeEventListener('mouseover', onOver, true);
+      doc.removeEventListener('mouseout', onOut, true);
+      doc.removeEventListener('click', onClick, true);
+      removePanel();
+    },
+  };
+}
+
 // --- Runtime wiring (skipped under node:test where `chrome` is undefined) ---
 if (typeof chrome !== 'undefined' && chrome.storage) {
   const store = createStore({
@@ -72,4 +159,11 @@ if (typeof chrome !== 'undefined' && chrome.storage) {
   });
 
   store.getSettings().then(s => { if (s.autoFillOnLoad) runFill(); });
+
+  const teach = teachController(document, store, async (el, valueKey, value) => {
+    const state = { values: await store.getValues(), mappings: await store.getMappings() };
+    await fillPage(document, state);
+  });
+  window.__appfillerStartTeach = () => teach.start();
+  window.__appfillerStopTeach = () => teach.stop();
 }
