@@ -1,0 +1,8 @@
+body { font: 14px system-ui, sans-serif; margin: 24px; max-width: 640px; }
+table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #eee; }
+input { padding: 6px; }
+.add { display: flex; gap: 8px; margin-bottom: 24px; }
+button { padding: 6px 12px; cursor: pointer; }
+td input { width: 100%; box-sizing: border-box; border: 1px solid transparent; }
+td input:focus { border-color: #2563eb; }

@@ -1,0 +1,53 @@
+<!doctype html><meta charset="utf-8"><title>AppFiller Harness</title>
+<style>
+  body { font: 14px system-ui; margin: 24px; max-width: 520px; }
+  label { display: block; margin: 14px 0 4px; font-weight: 600; }
+  input, select { width: 100%; padding: 6px; box-sizing: border-box; }
+  fieldset { margin: 14px 0; }
+  /* Fake Ashby/react-select control */
+  .rs { border: 1px solid #ccc; border-radius: 4px; padding: 8px; cursor: pointer; }
+  .rs__menu { border: 1px solid #ccc; margin-top: 2px; display: none; }
+  .rs__menu.open { display: block; }
+  .select__option { padding: 8px; cursor: pointer; }
+  .select__option:hover { background: #eef; }
+</style>
+<body>
+  <h1>Application form (test)</h1>
+
+  <label for="li">LinkedIn Profile</label>
+  <input id="li" type="url">
+
+  <label for="gh">GitHub</label>
+  <input id="gh" type="url">
+
+  <label for="gn">Gender</label>
+  <select id="gn"><option>Select…</option><option>Male</option><option>Female</option><option>Decline to self-identify</option></select>
+
+  <fieldset><legend>Are you Hispanic/Latino?</legend>
+    <label style="font-weight:400"><input type="radio" name="hl"> Yes</label>
+    <label style="font-weight:400"><input type="radio" name="hl"> No</label>
+  </fieldset>
+
+  <label id="race-lbl">Race/Ethnicity</label>
+  <div class="rs" role="combobox" aria-haspopup="listbox" aria-labelledby="race-lbl">
+    <span class="rs__value">Select…</span>
+    <div class="rs__menu">
+      <div class="select__option" role="option">Asian</div>
+      <div class="select__option" role="option">Black or African American</div>
+      <div class="select__option" role="option">White</div>
+      <div class="select__option" role="option">Decline to self-identify</div>
+    </div>
+  </div>
+
+  <script>
+    // Minimal react-select-like behavior for manual testing.
+    const rs = document.querySelector('.rs');
+    const menu = rs.querySelector('.rs__menu');
+    rs.addEventListener('click', (e) => {
+      if (e.target.classList.contains('select__option')) {
+        rs.querySelector('.rs__value').textContent = e.target.textContent;
+        menu.classList.remove('open');
+      } else { menu.classList.toggle('open'); }
+    });
+  </script>
+</body>
