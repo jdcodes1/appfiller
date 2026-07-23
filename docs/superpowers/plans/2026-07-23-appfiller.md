@@ -15,7 +15,7 @@
 - Fingerprint format: `normalize(labelText) + "|" + fieldType`. `fieldType` ∈ `{text, textarea, select, radio, checkbox, dropdown}`.
 - `normalize`: lowercase, trim, collapse internal whitespace to single spaces, strip trailing `*` and punctuation.
 - All synthetic DOM events use `{ bubbles: true }` and real event constructors so React registers them.
-- Value→option matching is case-insensitive substring (`optionText.toLowerCase().includes(value.toLowerCase())`).
+- Value→option matching: prefer an exact case-insensitive match; if none, fall back to case-insensitive substring (`optionText.toLowerCase().includes(value.toLowerCase())`). Exact-first prevents `"Female"` matching value `"Male"` via the "fe**male**" substring.
 - Libs in `src/lib/*.js` must be import-testable in Node (no `chrome`/`window` at module top level; DOM passed in as arguments).
 
 ---
@@ -358,6 +358,18 @@ export function getLabelText(el) {
     if (forLabel) return forLabel.textContent.trim();
   }
 
+  // For radio/checkbox, the group question (fieldset legend) identifies the
+  // field — the per-option wrapping <label> is the option text, not the
+  // field's identity. Check the legend before the wrapping label.
+  const type = (el.getAttribute && el.getAttribute('type') || '').toLowerCase();
+  if (type === 'radio' || type === 'checkbox') {
+    const fs = el.closest && el.closest('fieldset');
+    if (fs) {
+      const lg = fs.querySelector('legend');
+      if (lg && lg.textContent.trim()) return lg.textContent.trim();
+    }
+  }
+
   const wrapping = el.closest && el.closest('label');
   if (wrapping) {
     const clone = wrapping.cloneNode(true);
@@ -480,8 +492,13 @@ Expected: FAIL — cannot find module.
 `src/lib/fillers.js`:
 ```js
 export function matchOptionText(candidates, value) {
-  const v = (value || '').toLowerCase();
+  const v = (value || '').toLowerCase().trim();
   if (!v) return -1;
+  // 1. Exact (case-insensitive) match wins — avoids "Female" matching "Male".
+  for (let i = 0; i < candidates.length; i++) {
+    if ((candidates[i] || '').toLowerCase().trim() === v) return i;
+  }
+  // 2. Fall back to substring match.
   for (let i = 0; i < candidates.length; i++) {
     if ((candidates[i] || '').toLowerCase().includes(v)) return i;
   }
@@ -753,7 +770,9 @@ test('fillPage fills text, select, radio from mappings', async () => {
   assert.equal(w.document.getElementById('li').value, 'https://linkedin.com/in/joey');
   assert.equal(w.document.getElementById('gn').value, 'Male');
   assert.equal(w.document.getElementById('hn').checked, true);
-  assert.equal(res.filled, 3);
+  // Both radios of the group are collected and each is filled (idempotent),
+  // so the group contributes 2 to the count: li + gn + hy + hn = 4.
+  assert.equal(res.filled, 4);
 });
 ```
 
