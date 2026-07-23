@@ -44,3 +44,15 @@ test('fingerprint combines label and type', () => {
   const d = dom(`<label for="g">Gender</label><select id="g"></select>`);
   assert.equal(fingerprint(d.getElementById('g')), 'gender|select');
 });
+
+// Regression: a radio wrapped in its own option <label> inside a fieldset must
+// fingerprint by the group legend, not the per-option text ("Yes"/"No").
+test('radio in option-label uses group legend, not option text', () => {
+  const d = dom(`<fieldset><legend>Are you Hispanic/Latino?</legend>
+    <label><input type="radio" name="hl" id="hy">Yes</label>
+    <label><input type="radio" name="hl" id="hn">No</label>
+  </fieldset>`);
+  assert.equal(getLabelText(d.getElementById('hy')), 'Are you Hispanic/Latino?');
+  assert.equal(fingerprint(d.getElementById('hy')), 'are you hispanic/latino|radio');
+  assert.equal(fingerprint(d.getElementById('hn')), 'are you hispanic/latino|radio');
+});

@@ -36,6 +36,18 @@ export function getLabelText(el) {
     if (forLabel) return forLabel.textContent.trim();
   }
 
+  // For radio/checkbox, the group question (fieldset legend) identifies the
+  // field — the per-option wrapping <label> is the option text, not the
+  // field's identity. Check the legend before the wrapping label.
+  const type = (el.getAttribute && el.getAttribute('type') || '').toLowerCase();
+  if (type === 'radio' || type === 'checkbox') {
+    const fs = el.closest && el.closest('fieldset');
+    if (fs) {
+      const lg = fs.querySelector('legend');
+      if (lg && lg.textContent.trim()) return lg.textContent.trim();
+    }
+  }
+
   const wrapping = el.closest && el.closest('label');
   if (wrapping) {
     const clone = wrapping.cloneNode(true);
