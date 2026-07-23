@@ -1,0 +1,8 @@
+{
+  "name": "appfiller",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "scripts": { "test": "node --test" },
+  "devDependencies": { "jsdom": "^24.0.0" }
+}
