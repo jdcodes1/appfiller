@@ -92,8 +92,23 @@ export function realClick(el) {
   }
 }
 
-export function findOptions(doc) {
+export function findOptions(doc, controlEl) {
+  // Prefer the listbox the combobox points at: pages often hold OTHER hidden
+  // [role=option] lists (e.g. intl-tel-input's 245 phone-country entries), so a
+  // document-wide scan can match the wrong menu.
+  if (controlEl && controlEl.getAttribute) {
+    const listId = controlEl.getAttribute('aria-controls') || controlEl.getAttribute('aria-owns');
+    if (listId) {
+      const list = doc.getElementById(listId);
+      if (list) {
+        const scoped = Array.from(list.querySelectorAll('[role="option"]'));
+        if (scoped.length > 0) return scoped;
+      }
+    }
+  }
   let opts = Array.from(doc.querySelectorAll('[role="option"]'));
+  const visible = opts.filter(o => o.offsetParent !== null || o.getClientRects().length > 0);
+  if (visible.length > 0) return visible;
   if (opts.length === 0) {
     opts = Array.from(doc.querySelectorAll('[class*="option"], [class*="Option"]'))
       .filter(o => o.offsetParent !== null || o.getClientRects().length > 0);

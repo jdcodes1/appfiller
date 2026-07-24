@@ -42,16 +42,29 @@ export function readCurrentValue(el, type) {
   }
   if (type === 'checkbox') return el.checked ? 'yes' : 'no';
   if (type === 'dropdown') {
-    // Combobox input: the chosen value renders as text in the control container.
+    // Combobox input: the chosen value renders as text in the control
+    // container. Walk up from the input until an ancestor renders something —
+    // react-select nests the input in an empty "input-container" first.
     if (el.tagName === 'INPUT') {
-      if (el.value && el.value.trim()) return el.value.trim();
-      const container = el.closest('[class*="select__control"],[class*="container"],[class*="control"]')
-        || el.parentElement?.parentElement || el.parentElement;
-      return container ? containerText(container) : '';
+      if (el.value && el.value.trim()) return capped(el.value.trim());
+      const control = el.closest('[class*="select__control"]');
+      if (control) return capped(containerText(control));
+      let p = el.parentElement;
+      for (let i = 0; i < 3 && p; i++, p = p.parentElement) {
+        const txt = containerText(p);
+        if (txt) return capped(txt);
+      }
+      return '';
     }
-    return containerText(el);
+    return capped(containerText(el));
   }
   return '';
+}
+
+// A sane field value is short; hundreds of chars means we scraped a whole
+// option list or similar junk — refuse it rather than store garbage.
+function capped(text) {
+  return text.length > 200 ? '' : text;
 }
 
 function containerText(container) {
@@ -63,10 +76,13 @@ function containerText(container) {
 export function isVisible(el) {
   if (el.hidden || el.getAttribute('aria-hidden') === 'true') return false;
   if (el.offsetParent !== null || el.getClientRects().length > 0) return true;
-  // Environments without layout (jsdom tests): fall back to computed style.
-  // In real browsers a zero-rect element also lands here; position() keeps its
-  // icon hidden anyway, so a false positive is harmless.
-  const st = el.ownerDocument.defaultView.getComputedStyle(el);
+  const doc = el.ownerDocument;
+  // Real browsers: the document always has layout, so zero rects means the
+  // field (or an ancestor) is genuinely hidden — e.g. intl-tel-input's search
+  // box inside its closed flag dropdown.
+  if (doc.documentElement.getClientRects().length > 0) return false;
+  // Layout-less environments (jsdom tests): fall back to computed style.
+  const st = doc.defaultView.getComputedStyle(el);
   return st.display !== 'none' && st.visibility !== 'hidden';
 }
 

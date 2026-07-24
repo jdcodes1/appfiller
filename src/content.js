@@ -36,16 +36,16 @@ export async function openAndWaitReal(controlEl, searchText, wait = (ms) => new 
     }
   }
   const deadline = Date.now() + 2500;
-  let opts = F.findOptions(doc);
+  let opts = F.findOptions(doc, controlEl);
   while (opts.length === 0 && Date.now() < deadline) {
     await wait(100);
-    opts = F.findOptions(doc);
+    opts = F.findOptions(doc, controlEl);
   }
   // Async-filtered lists repopulate after the first options appear; give them a
   // beat to settle, then re-read.
   if (opts.length > 0 && controlEl.tagName === 'INPUT' && searchText) {
     await wait(150);
-    opts = F.findOptions(doc);
+    opts = F.findOptions(doc, controlEl);
   }
   return opts;
 }
@@ -139,7 +139,7 @@ if (typeof chrome !== 'undefined' && chrome.storage) {
     if (msg.action === 'fillPage') { runFill().then(sendResponse); return true; }
     if (msg.action === 'showIcons') { saveIcons.enable().then(() => sendResponse({ ok: true, shown: true })); return true; }
     if (msg.action === 'hideIcons') { saveIcons.disable(); sendResponse({ ok: true, shown: false }); return false; }
-    if (msg.action === 'iconsState') { sendResponse({ shown: saveIcons.isEnabled() }); return false; }
+    if (msg.action === 'iconsState') { sendResponse({ shown: saveIcons.isEnabled(), href: location.href }); return false; }
   });
 
   store.getSettings().then(async s => {
