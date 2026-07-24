@@ -6,3 +6,4 @@
 .appfiller-panel button { flex: 1; padding: 6px; border: 0; border-radius: 6px; cursor: pointer; }
 .appfiller-panel .primary { background: #2563eb; color: #fff; }
 .appfiller-panel .muted { font-size: 11px; color: #555; word-break: break-word; }
+.appfiller-panel .af-err { color: #b91c1c; font-size: 11px; margin-bottom: 6px; }

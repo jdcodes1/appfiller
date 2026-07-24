@@ -66,9 +66,10 @@ export function buildTeachPanel(doc, { labelText, valueKeys }) {
     <select class="af-key"></select>
     <input class="af-newkey" placeholder="new key (e.g. github)" style="display:none">
     <input class="af-newval" placeholder="value" style="display:none">
+    <div class="af-err" style="display:none"></div>
     <div class="row">
-      <button class="af-save primary">Save & fill</button>
-      <button class="af-cancel">Cancel</button>
+      <button type="button" class="af-save primary">Save &amp; fill</button>
+      <button type="button" class="af-cancel">Cancel</button>
     </div>`;
   panel.querySelector('.muted').textContent = `Field: ${labelText || '(no label found)'}`;
   const keySel = panel.querySelector('.af-key');
@@ -84,11 +85,16 @@ export function buildTeachPanel(doc, { labelText, valueKeys }) {
   keySel.appendChild(newOption);
   const newKey = panel.querySelector('.af-newkey');
   const newVal = panel.querySelector('.af-newval');
-  keySel.addEventListener('change', () => {
+  const syncNewFields = () => {
     const isNew = keySel.value === '__new__';
     newKey.style.display = isNew ? 'block' : 'none';
     newVal.style.display = isNew ? 'block' : 'none';
-  });
+  };
+  keySel.addEventListener('change', syncNewFields);
+  // Reflect the INITIAL selection too. With no saved keys, "Create new…" is the
+  // only option and is already selected, so `change` never fires — without this
+  // the new key/value inputs would stay hidden and nothing could be created.
+  syncNewFields();
   return panel;
 }
 
@@ -121,13 +127,24 @@ export function teachController(doc, store, onTaught) {
     panel.querySelector('.af-save').addEventListener('click', save);
   };
 
+  function showError(msg) {
+    const err = panel.querySelector('.af-err');
+    err.textContent = msg;
+    err.style.display = 'block';
+  }
+
   async function save() {
     const keySel = panel.querySelector('.af-key');
     let valueKey = keySel.value;
     if (valueKey === '__new__') {
-      valueKey = panel.querySelector('.af-newkey').value.trim();
+      const keyInput = panel.querySelector('.af-newkey');
+      valueKey = keyInput.value.trim();
       const val = panel.querySelector('.af-newval').value;
-      if (!valueKey) return;
+      if (!valueKey) {
+        showError('Enter a key name (e.g. gender) before saving.');
+        keyInput.focus();
+        return;
+      }
       await store.setValue(valueKey, val);
     }
     await store.setMapping(fingerprint(current), valueKey);
