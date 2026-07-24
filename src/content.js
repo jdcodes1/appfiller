@@ -27,27 +27,45 @@ export function collectFields(doc) {
 export async function openAndWaitReal(controlEl, searchText, wait = (ms) => new Promise(r => setTimeout(r, ms))) {
   const doc = controlEl.ownerDocument;
   F.realClick(controlEl);
-  if (controlEl.tagName === 'INPUT') {
-    controlEl.focus();
-    // Typing into the combobox filters long/async option lists (locations,
-    // schools) down to something clickable.
-    if (searchText) {
-      try { F.setNativeValue(controlEl, searchText); } catch (e) { /* readonly comboboxes */ }
+  if (controlEl.tagName !== 'INPUT') {
+    const deadline = Date.now() + 2500;
+    let opts = F.findOptions(doc, controlEl);
+    while (opts.length === 0 && Date.now() < deadline) {
+      await wait(100);
+      opts = F.findOptions(doc, controlEl);
+    }
+    return opts;
+  }
+  controlEl.focus();
+  // Typing filters long/async option lists (locations, schools) down to
+  // something clickable — but search boxes often reject the full stored text
+  // ("New York City, New York, United States" finds nothing on Ashby), so fall
+  // back to progressively shorter queries: full → up to first comma → first
+  // word → just opened.
+  const queries = [];
+  if (searchText) {
+    queries.push(searchText);
+    const beforeComma = searchText.split(',')[0].trim();
+    if (beforeComma && beforeComma !== searchText) queries.push(beforeComma);
+  }
+  queries.push('');
+  for (const q of queries) {
+    if (q) {
+      try { F.setNativeValue(controlEl, q); } catch (e) { /* readonly comboboxes */ }
+    }
+    const deadline = Date.now() + 1500;
+    let opts = F.findOptions(doc, controlEl);
+    while (opts.length === 0 && Date.now() < deadline) {
+      await wait(100);
+      opts = F.findOptions(doc, controlEl);
+    }
+    if (opts.length > 0) {
+      // Async lists repopulate after the first options appear; let them settle.
+      await wait(150);
+      return F.findOptions(doc, controlEl);
     }
   }
-  const deadline = Date.now() + 2500;
-  let opts = F.findOptions(doc, controlEl);
-  while (opts.length === 0 && Date.now() < deadline) {
-    await wait(100);
-    opts = F.findOptions(doc, controlEl);
-  }
-  // Async-filtered lists repopulate after the first options appear; give them a
-  // beat to settle, then re-read.
-  if (opts.length > 0 && controlEl.tagName === 'INPUT' && searchText) {
-    await wait(150);
-    opts = F.findOptions(doc, controlEl);
-  }
-  return opts;
+  return [];
 }
 
 // True when the control already holds the intended value. Lets repeat passes be
@@ -65,6 +83,9 @@ export function alreadyHasValue(el, type, value) {
   }
   if (type === 'dropdown') {
     if (el.tagName === 'INPUT') {
+      // An open menu means the selection never committed — the input may hold
+      // our typed search text, which must not count as filled.
+      if (el.getAttribute('aria-expanded') === 'true') return false;
       if ((el.value || '').toLowerCase().trim() === v) return true;
       const container = el.closest('[class*="select__control"]') || el.parentElement?.parentElement || el.parentElement;
       return !!container && (container.textContent || '').toLowerCase().includes(v);
@@ -127,8 +148,16 @@ if (typeof chrome !== 'undefined' && chrome.storage) {
   const saveIcons = createSaveIcons(document, store, { collectFields });
 
   async function runFill() {
-    const [values, mappings] = await Promise.all([store.getValues(), store.getMappings()]);
-    const res = await fillPage(document, { values, mappings });
+    const getState = async () => ({
+      values: await store.getValues(),
+      mappings: await store.getMappings(),
+    });
+    // Retry passes: SPA forms (Ashby) often haven't mounted yet on the first
+    // pass, and React re-renders can revert the first pass's writes.
+    let res = await fillPage(document, await getState());
+    if (res.total === 0 || res.filled < res.total) {
+      res = await autoFillWithRetries(document, getState, { delays: [600, 1500] });
+    }
     // After a fill run, surface save icons on everything we couldn't fill so
     // the user can bank those values with one click.
     await saveIcons.enable();

@@ -107,3 +107,16 @@ test('disable removes all icons', async () => {
   assert.equal(d.querySelectorAll('.appfiller-save-icon').length, 0);
   assert.equal(icons.isEnabled(), false);
 });
+
+test('no icon for a radio group when any option is already mapped', async () => {
+  const d = dom(`
+    <label><input type="radio" name="consent" value="1"> Yes I consent</label>
+    <label><input type="radio" name="consent" value="2"> No I do not</label>`);
+  const store = memStore({
+    values: { yes_i_consent: 'Yes I consent' },
+    mappings: { 'yes i consent|radio': 'yes_i_consent' },
+  });
+  const icons = createSaveIcons(d, store, { collectFields });
+  await icons.enable();
+  assert.equal(d.querySelectorAll('.appfiller-save-icon').length, 0);
+});

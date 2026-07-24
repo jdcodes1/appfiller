@@ -56,3 +56,21 @@ test('radio in option-label uses group legend, not option text', () => {
   assert.equal(fingerprint(d.getElementById('hy')), 'are you hispanic/latino|radio');
   assert.equal(fingerprint(d.getElementById('hn')), 'are you hispanic/latino|radio');
 });
+
+test('label found in Ashby-style field wrapper (sibling label, no input id)', () => {
+  const d = dom(`
+    <div class="_fieldEntry">
+      <label for="_systemfield_location">Where do you plan on working from?</label>
+      <div class="_inputContainer"><input role="combobox" placeholder="Start typing..."></div>
+    </div>`);
+  assert.equal(getLabelText(d.querySelector('input')), 'Where do you plan on working from?');
+});
+
+test('sibling label pointing at a different control is not stolen', () => {
+  const d = dom(`
+    <div>
+      <label for="other">Other field</label><input id="other" type="text">
+      <div><input id="me" type="text" placeholder="mine"></div>
+    </div>`);
+  assert.equal(getLabelText(d.getElementById('me')), 'mine');
+});

@@ -116,13 +116,46 @@ export function findOptions(doc, controlEl) {
   return opts;
 }
 
+function fireKey(el, key, keyCode) {
+  for (const type of ['keydown', 'keypress', 'keyup']) {
+    el.dispatchEvent(new (el.ownerDocument.defaultView.KeyboardEvent)(type, {
+      bubbles: true, cancelable: true, key, code: key, keyCode, which: keyCode,
+    }));
+  }
+}
+
+// Keyboard-driven comboboxes (Ashby) ignore synthetic clicks on options; the
+// selection commits via ArrowDown/Enter on the input. Move the highlight from
+// wherever it is (aria-activedescendant) to the matched option and press Enter.
+export function keyboardCommit(controlEl, options, idx) {
+  const active = controlEl.getAttribute('aria-activedescendant');
+  let cur = options.findIndex(o => o.id && o.id === active);
+  if (cur < 0) cur = 0;
+  const delta = idx - cur;
+  for (let i = 0; i < Math.abs(delta); i++) {
+    fireKey(controlEl, delta > 0 ? 'ArrowDown' : 'ArrowUp', delta > 0 ? 40 : 38);
+  }
+  fireKey(controlEl, 'Enter', 13);
+}
+
 // openAndWait(controlEl, searchText) opens the menu (typing searchText into
 // combobox inputs to filter async/long option lists) and resolves with the
 // visible option elements.
-export async function fillDropdown(controlEl, value, { openAndWait }) {
+export async function fillDropdown(controlEl, value, { openAndWait, wait }) {
+  const w = wait || ((ms) => new Promise(r => setTimeout(r, ms)));
   const options = await openAndWait(controlEl, value);
   const idx = matchOptionText(options.map(o => o.textContent), value);
-  if (idx === -1) return false;
+  if (idx === -1) {
+    // Don't leave a menu hanging open after a failed match.
+    if (controlEl.tagName === 'INPUT') fireKey(controlEl, 'Escape', 27);
+    return false;
+  }
   realClick(options[idx]);
+  if (controlEl.tagName === 'INPUT') {
+    await w(150);
+    if (controlEl.getAttribute('aria-expanded') === 'true') {
+      keyboardCommit(controlEl, options, idx);
+    }
+  }
   return true;
 }

@@ -78,3 +78,38 @@ test('alreadyHasValue via control container text prevents re-clicking combobox',
   assert.equal(opened, 0);
   assert.equal(res.filled, 1);
 });
+
+test('keyboard-driven combobox (Ashby): click ignored, ArrowDown+Enter commits', async () => {
+  const d = dom(`
+    <label for="loc">Location</label>
+    <div><input id="loc" role="combobox" aria-expanded="false"></div>
+    <div id="menu"></div>`);
+  const cb = d.getElementById('loc');
+  const menu = d.getElementById('menu');
+  let highlighted = 0;
+  let committed = null;
+  cb.addEventListener('input', () => {
+    cb.setAttribute('aria-expanded', 'true');
+    menu.innerHTML = '<div role="option" id="opt-0">Austin, Texas</div><div role="option" id="opt-1">New York City</div>';
+    highlighted = 0;
+    cb.setAttribute('aria-activedescendant', 'opt-0');
+  });
+  // This widget ignores clicks on options entirely (like Ashby).
+  cb.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown') { highlighted++; cb.setAttribute('aria-activedescendant', 'opt-' + highlighted); }
+    if (e.key === 'Enter') {
+      committed = menu.children[highlighted].textContent;
+      cb.setAttribute('aria-expanded', 'false');
+      menu.innerHTML = '';
+    }
+  });
+
+  const state = { values: { location: 'New York City' }, mappings: { 'location|dropdown': 'location' } };
+  const res = await fillPage(d, state, {
+    ...F,
+    openAndWait: (el, text) => openAndWaitReal(el, text, (ms) => new Promise(r => setTimeout(r, 1))),
+  });
+  assert.equal(res.filled, 1);
+  assert.equal(committed, 'New York City');
+  assert.equal(cb.getAttribute('aria-expanded'), 'false');
+});

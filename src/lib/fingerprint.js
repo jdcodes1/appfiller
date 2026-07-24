@@ -76,6 +76,26 @@ export function getLabelText(el) {
     if (lg) return lg.textContent.trim();
   }
 
+  // Ashby-style field wrappers: the <label> is a sibling in a wrapper div and
+  // its `for` points at nothing usable (the input has no id). Walk up a few
+  // levels; an ancestor containing exactly one label is this field's wrapper.
+  let anc = el.parentElement;
+  for (let i = 0; i < 4 && anc; i++, anc = anc.parentElement) {
+    const labels = anc.querySelectorAll('label');
+    if (labels.length > 1) break; // reached a multi-field container
+    if (labels.length === 1) {
+      const lab = labels[0];
+      const forId = lab.getAttribute('for');
+      const target = forId ? doc.getElementById(forId) : null;
+      // Skip a label that clearly belongs to a different control.
+      if (target && target !== el && target.matches && target.matches('input,textarea,select')) break;
+      const clone = lab.cloneNode(true);
+      for (const c of clone.querySelectorAll('input,select,textarea')) c.remove();
+      const txt = clone.textContent.trim();
+      if (txt) return txt;
+    }
+  }
+
   const ph = el.getAttribute && el.getAttribute('placeholder');
   if (ph) return ph.trim();
 

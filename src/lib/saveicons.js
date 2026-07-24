@@ -1,5 +1,9 @@
 import { fingerprint, getFieldType, getLabelText, normalize } from './fingerprint.js';
 
+function cssEscape(s) {
+  return (typeof CSS !== 'undefined' && CSS.escape) ? CSS.escape(s) : s;
+}
+
 // Auto-generate a storage key from the field's label: "First Name *" -> "first_name".
 export function autoKey(labelText) {
   return normalize(labelText)
@@ -148,12 +152,22 @@ export function createSaveIcons(doc, store, { collectFields, onSaved } = {}) {
     const [values, mappings] = await Promise.all([store.getValues(), store.getMappings()]);
     const fields = collectFields(doc);
     const wanted = new Map(); // fp -> field
+    const seenRadioGroups = new Set();
     for (const field of fields) {
       if (!isVisible(field)) continue;
       const fp = fingerprint(field);
-      if (wanted.has(fp)) continue; // one icon per radio group / duplicate label
-      const valueKey = mappings[fp];
-      if (valueKey && valueKey in values) continue; // autofillable -> no icon
+      if (wanted.has(fp)) continue; // duplicate label
+      // Radios: one icon per group, and none if any option in the group is
+      // already mapped (option labels give each radio its own fingerprint).
+      if (field.type === 'radio' && field.name) {
+        const group = Array.from(doc.querySelectorAll(`input[type="radio"][name="${cssEscape(field.name)}"]`));
+        if (seenRadioGroups.has(field.name)) continue;
+        seenRadioGroups.add(field.name);
+        if (group.some(r => { const k = mappings[fingerprint(r)]; return k && k in values; })) continue;
+      } else {
+        const valueKey = mappings[fp];
+        if (valueKey && valueKey in values) continue; // autofillable -> no icon
+      }
       wanted.set(fp, field);
     }
     // Drop icons for fields that vanished or got a saved value.
