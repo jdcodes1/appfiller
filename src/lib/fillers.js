@@ -101,8 +101,11 @@ export function findOptions(doc) {
   return opts;
 }
 
+// openAndWait(controlEl, searchText) opens the menu (typing searchText into
+// combobox inputs to filter async/long option lists) and resolves with the
+// visible option elements.
 export async function fillDropdown(controlEl, value, { openAndWait }) {
-  const options = await openAndWait(controlEl);
+  const options = await openAndWait(controlEl, value);
   const idx = matchOptionText(options.map(o => o.textContent), value);
   if (idx === -1) return false;
   realClick(options[idx]);

@@ -2,11 +2,15 @@ import { serializeBackup } from './lib/backup.js';
 import { loadBackupHandle, hasReadWritePermission, writeThroughHandle } from './fsBackup.js';
 
 const $ = (id) => document.getElementById(id);
-let teaching = false;
 
 async function activeTab() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   return tab;
+}
+
+function renderIconsBtn(shown) {
+  $('icons').textContent = shown ? 'Hide save icons' : 'Show save icons';
+  $('icons').classList.toggle('active', !!shown);
 }
 
 $('fill').addEventListener('click', async () => {
@@ -14,23 +18,30 @@ $('fill').addEventListener('click', async () => {
   try {
     const res = await chrome.tabs.sendMessage(tab.id, { action: 'fillPage' });
     $('fill').textContent = res ? `Filled ${res.filled}/${res.total}` : 'Fill page';
+    renderIconsBtn(true); // runFill enables icons for the unfilled fields
   } catch (e) {
     $('fill').textContent = 'Not available here';
   }
 });
 
-$('teach').addEventListener('click', async () => {
+$('icons').addEventListener('click', async () => {
   const tab = await activeTab();
-  const nextTeaching = !teaching;
   try {
-    await chrome.tabs.sendMessage(tab.id, { action: nextTeaching ? 'startTeach' : 'stopTeach' });
-    teaching = nextTeaching;
-    $('teach').textContent = teaching ? 'Stop teaching' : 'Teach a field';
-    $('teach').classList.toggle('active', teaching);
+    const { shown } = await chrome.tabs.sendMessage(tab.id, { action: 'iconsState' });
+    const res = await chrome.tabs.sendMessage(tab.id, { action: shown ? 'hideIcons' : 'showIcons' });
+    renderIconsBtn(res.shown);
   } catch (e) {
-    $('teach').textContent = 'Not available here';
+    $('icons').textContent = 'Not available here';
   }
 });
+
+(async () => {
+  try {
+    const tab = await activeTab();
+    const { shown } = await chrome.tabs.sendMessage(tab.id, { action: 'iconsState' });
+    renderIconsBtn(shown);
+  } catch (e) { /* content script not on this page */ }
+})();
 
 $('opts').addEventListener('click', (e) => { e.preventDefault(); chrome.runtime.openOptionsPage(); });
 

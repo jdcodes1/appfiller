@@ -1,6 +1,7 @@
-import { fingerprint, getFieldType, getLabelText } from './lib/fingerprint.js';
+import { fingerprint, getFieldType, isComboboxInput } from './lib/fingerprint.js';
 import * as F from './lib/fillers.js';
 import { createStore } from './lib/storage.js';
+import { createSaveIcons } from './lib/saveicons.js';
 
 const DROPDOWN_SELECTOR = '[role="combobox"],[aria-haspopup="listbox"],[class*="select__control"]';
 
@@ -15,18 +16,36 @@ export function collectFields(doc) {
   }
   for (const el of doc.querySelectorAll(DROPDOWN_SELECTOR)) {
     if (seen.has(el)) continue;
+    // A react-select control wrapping an already-collected combobox input is
+    // the same field — the input is the canonical element.
+    if (el.tagName !== 'INPUT' && el.querySelector && [...el.querySelectorAll('input')].some(i => seen.has(i))) continue;
     out.push(el);
   }
   return out;
 }
 
-export async function openAndWaitReal(controlEl, wait = (ms) => new Promise(r => setTimeout(r, ms))) {
+export async function openAndWaitReal(controlEl, searchText, wait = (ms) => new Promise(r => setTimeout(r, ms))) {
+  const doc = controlEl.ownerDocument;
   F.realClick(controlEl);
-  const deadline = Date.now() + 1500;
-  let opts = F.findOptions(controlEl.ownerDocument);
+  if (controlEl.tagName === 'INPUT') {
+    controlEl.focus();
+    // Typing into the combobox filters long/async option lists (locations,
+    // schools) down to something clickable.
+    if (searchText) {
+      try { F.setNativeValue(controlEl, searchText); } catch (e) { /* readonly comboboxes */ }
+    }
+  }
+  const deadline = Date.now() + 2500;
+  let opts = F.findOptions(doc);
   while (opts.length === 0 && Date.now() < deadline) {
     await wait(100);
-    opts = F.findOptions(controlEl.ownerDocument);
+    opts = F.findOptions(doc);
+  }
+  // Async-filtered lists repopulate after the first options appear; give them a
+  // beat to settle, then re-read.
+  if (opts.length > 0 && controlEl.tagName === 'INPUT' && searchText) {
+    await wait(150);
+    opts = F.findOptions(doc);
   }
   return opts;
 }
@@ -45,6 +64,11 @@ export function alreadyHasValue(el, type, value) {
     return !!opt && opt.textContent.toLowerCase().trim() === v;
   }
   if (type === 'dropdown') {
+    if (el.tagName === 'INPUT') {
+      if ((el.value || '').toLowerCase().trim() === v) return true;
+      const container = el.closest('[class*="select__control"]') || el.parentElement?.parentElement || el.parentElement;
+      return !!container && (container.textContent || '').toLowerCase().includes(v);
+    }
     return (el.textContent || '').toLowerCase().includes(v);
   }
   // radio/checkbox fills are cheap and idempotent; always re-apply.
@@ -53,7 +77,7 @@ export function alreadyHasValue(el, type, value) {
 
 export async function fillPage(doc, state, deps = F) {
   const { values, mappings } = state;
-  const openAndWait = deps.openAndWait || ((el) => openAndWaitReal(el));
+  const openAndWait = deps.openAndWait || ((el, text) => openAndWaitReal(el, text));
   let filled = 0;
   const fields = collectFields(doc);
   for (const el of fields) {
@@ -93,119 +117,6 @@ export async function autoFillWithRetries(doc, getState, opts = {}) {
   return last;
 }
 
-export function buildTeachPanel(doc, { labelText, valueKeys }) {
-  const panel = doc.createElement('div');
-  panel.className = 'appfiller-panel';
-  panel.innerHTML = `
-    <div class="muted">Field: </div>
-    <label>What data goes here?</label>
-    <select class="af-key"></select>
-    <input class="af-newkey" placeholder="new key (e.g. github)" style="display:none">
-    <input class="af-newval" placeholder="value" style="display:none">
-    <div class="af-err" style="display:none"></div>
-    <div class="row">
-      <button type="button" class="af-save primary">Save &amp; fill</button>
-      <button type="button" class="af-cancel">Cancel</button>
-    </div>`;
-  panel.querySelector('.muted').textContent = `Field: ${labelText || '(no label found)'}`;
-  const keySel = panel.querySelector('.af-key');
-  for (const k of valueKeys) {
-    const option = doc.createElement('option');
-    option.value = k;
-    option.textContent = k;
-    keySel.appendChild(option);
-  }
-  const newOption = doc.createElement('option');
-  newOption.value = '__new__';
-  newOption.textContent = 'Create new…';
-  keySel.appendChild(newOption);
-  const newKey = panel.querySelector('.af-newkey');
-  const newVal = panel.querySelector('.af-newval');
-  const syncNewFields = () => {
-    const isNew = keySel.value === '__new__';
-    newKey.style.display = isNew ? 'block' : 'none';
-    newVal.style.display = isNew ? 'block' : 'none';
-  };
-  keySel.addEventListener('change', syncNewFields);
-  // Reflect the INITIAL selection too. With no saved keys, "Create new…" is the
-  // only option and is already selected, so `change` never fires — without this
-  // the new key/value inputs would stay hidden and nothing could be created.
-  syncNewFields();
-  return panel;
-}
-
-export function teachController(doc, store, onTaught) {
-  let current = null;
-  let panel = null;
-
-  const onOver = (e) => {
-    const el = e.target;
-    if (panel && panel.contains(el)) return;
-    el.classList?.add('appfiller-highlight');
-  };
-  const onOut = (e) => { e.target.classList?.remove('appfiller-highlight'); };
-
-  const onClick = async (e) => {
-    const el = e.target;
-    if (panel && panel.contains(el)) return;
-    const field = el.closest('input,textarea,select,[role="combobox"],[aria-haspopup="listbox"],[class*="select__control"]');
-    if (!field) return;
-    e.preventDefault(); e.stopPropagation();
-    current = field;
-    removePanel();
-    const valueKeys = Object.keys(await store.getValues());
-    panel = buildTeachPanel(doc, { labelText: getLabelText(field), valueKeys });
-    const rect = field.getBoundingClientRect();
-    panel.style.top = (rect.bottom + doc.defaultView.scrollY + 4) + 'px';
-    panel.style.left = (rect.left + doc.defaultView.scrollX) + 'px';
-    doc.body.appendChild(panel);
-    panel.querySelector('.af-cancel').addEventListener('click', removePanel);
-    panel.querySelector('.af-save').addEventListener('click', save);
-  };
-
-  function showError(msg) {
-    const err = panel.querySelector('.af-err');
-    err.textContent = msg;
-    err.style.display = 'block';
-  }
-
-  async function save() {
-    const keySel = panel.querySelector('.af-key');
-    let valueKey = keySel.value;
-    if (valueKey === '__new__') {
-      const keyInput = panel.querySelector('.af-newkey');
-      valueKey = keyInput.value.trim();
-      const val = panel.querySelector('.af-newval').value;
-      if (!valueKey) {
-        showError('Enter a key name (e.g. gender) before saving.');
-        keyInput.focus();
-        return;
-      }
-      await store.setValue(valueKey, val);
-    }
-    await store.setMapping(fingerprint(current), valueKey);
-    const value = (await store.getValues())[valueKey];
-    onTaught?.(current, valueKey, value);
-    removePanel();
-  }
-
-  function removePanel() { if (panel) { panel.remove(); panel = null; } }
-
-  return {
-    start() {
-      doc.addEventListener('mouseover', onOver, true);
-      doc.addEventListener('mouseout', onOut, true);
-      doc.addEventListener('click', onClick, true);
-    },
-    stop() {
-      doc.removeEventListener('mouseover', onOver, true);
-      doc.removeEventListener('mouseout', onOut, true);
-      doc.removeEventListener('click', onClick, true);
-      removePanel();
-    },
-  };
-}
-
 // --- Runtime wiring (skipped under node:test where `chrome` is undefined) ---
 if (typeof chrome !== 'undefined' && chrome.storage) {
   const store = createStore({
@@ -213,29 +124,32 @@ if (typeof chrome !== 'undefined' && chrome.storage) {
     set: (o) => chrome.storage.local.set(o),
   });
 
+  const saveIcons = createSaveIcons(document, store, { collectFields });
+
   async function runFill() {
     const [values, mappings] = await Promise.all([store.getValues(), store.getMappings()]);
-    return fillPage(document, { values, mappings });
+    const res = await fillPage(document, { values, mappings });
+    // After a fill run, surface save icons on everything we couldn't fill so
+    // the user can bank those values with one click.
+    await saveIcons.enable();
+    return res;
   }
 
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     if (msg.action === 'fillPage') { runFill().then(sendResponse); return true; }
-    if (msg.action === 'startTeach') { window.__appfillerStartTeach?.(); sendResponse({ ok: true }); return false; }
-    if (msg.action === 'stopTeach') { window.__appfillerStopTeach?.(); sendResponse({ ok: true }); return false; }
+    if (msg.action === 'showIcons') { saveIcons.enable().then(() => sendResponse({ ok: true, shown: true })); return true; }
+    if (msg.action === 'hideIcons') { saveIcons.disable(); sendResponse({ ok: true, shown: false }); return false; }
+    if (msg.action === 'iconsState') { sendResponse({ shown: saveIcons.isEnabled() }); return false; }
   });
 
-  store.getSettings().then(s => {
+  store.getSettings().then(async s => {
     if (!s.autoFillOnLoad) return;
-    autoFillWithRetries(document, async () => ({
+    const res = await autoFillWithRetries(document, async () => ({
       values: await store.getValues(),
       mappings: await store.getMappings(),
     }));
+    // Only auto-surface icons on pages that look like a form we care about —
+    // either something filled, or there are several fillable fields.
+    if (res.filled > 0 || res.total >= 3) await saveIcons.enable();
   });
-
-  const teach = teachController(document, store, async (el, valueKey, value) => {
-    const state = { values: await store.getValues(), mappings: await store.getMappings() };
-    await fillPage(document, state);
-  });
-  window.__appfillerStartTeach = () => teach.start();
-  window.__appfillerStopTeach = () => teach.stop();
 }

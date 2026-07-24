@@ -7,6 +7,18 @@ export function normalize(text) {
     .trim();
 }
 
+// Inputs that are really the search box of a custom dropdown (react-select on
+// Greenhouse, Ashby's combobox, etc). Typing into them never selects an option,
+// so they must go through the dropdown fill path, not the text path.
+export function isComboboxInput(el) {
+  if (el.tagName !== 'INPUT') return false;
+  if ((el.getAttribute('role') || '').toLowerCase() === 'combobox') return true;
+  const ac = (el.getAttribute('aria-autocomplete') || '').toLowerCase();
+  if (ac === 'list' || ac === 'both') return true;
+  if ((el.getAttribute('aria-haspopup') || '').toLowerCase() === 'listbox') return true;
+  return !!(el.closest && el.closest('[class*="select__control"]'));
+}
+
 export function getFieldType(el) {
   const tag = el.tagName.toLowerCase();
   if (tag === 'textarea') return 'textarea';
@@ -15,6 +27,7 @@ export function getFieldType(el) {
     const t = (el.getAttribute('type') || 'text').toLowerCase();
     if (t === 'radio') return 'radio';
     if (t === 'checkbox') return 'checkbox';
+    if (isComboboxInput(el)) return 'dropdown';
     return 'text';
   }
   return 'dropdown';
