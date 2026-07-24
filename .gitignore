@@ -1,1 +1,7 @@
 node_modules/
+
+# Extension signing private key — pins the extension ID. NEVER commit.
+key.pem
+
+# Personal data backup (EEO/diversity answers, LinkedIn, etc). NEVER commit.
+data/backup.json

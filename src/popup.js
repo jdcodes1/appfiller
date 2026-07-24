@@ -1,3 +1,6 @@
+import { serializeBackup } from './lib/backup.js';
+import { loadBackupHandle, hasReadWritePermission, writeThroughHandle } from './fsBackup.js';
+
 const $ = (id) => document.getElementById(id);
 let teaching = false;
 
@@ -30,6 +33,37 @@ $('teach').addEventListener('click', async () => {
 });
 
 $('opts').addEventListener('click', (e) => { e.preventDefault(); chrome.runtime.openOptionsPage(); });
+
+$('backupNow').addEventListener('click', async () => {
+  const btn = $('backupNow');
+  const original = 'Back up now';
+  if (typeof window.showSaveFilePicker !== 'function') {
+    btn.textContent = 'Not supported here';
+    setTimeout(() => { btn.textContent = original; }, 2000);
+    return;
+  }
+  const handle = await loadBackupHandle();
+  if (!handle) {
+    btn.textContent = 'Link a file on Options first';
+    setTimeout(() => { btn.textContent = original; }, 2500);
+    return;
+  }
+  try {
+    if (!(await hasReadWritePermission(handle, { interactive: true }))) {
+      btn.textContent = 'Permission denied';
+      setTimeout(() => { btn.textContent = original; }, 2000);
+      return;
+    }
+    const { values = {} } = await chrome.storage.local.get('values');
+    const { mappings = {} } = await chrome.storage.local.get('mappings');
+    const data = serializeBackup({ values, mappings }, new Date().toISOString());
+    await writeThroughHandle(handle, JSON.stringify(data, null, 2));
+    btn.textContent = 'Backed up ✓';
+  } catch (e) {
+    btn.textContent = 'Backup failed';
+  }
+  setTimeout(() => { btn.textContent = original; }, 2000);
+});
 
 (async () => {
   const { settings = {} } = await chrome.storage.local.get('settings');

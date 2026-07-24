@@ -9,4 +9,5 @@ test('manifest is valid MV3', () => {
   assert.ok(m.content_scripts[0].matches.includes('<all_urls>'));
   assert.equal(m.action.default_popup, 'src/popup.html');
   assert.equal(m.options_page, 'src/options.html');
+  assert.ok(typeof m.key === 'string' && m.key.length > 0, 'manifest must pin an extension key');
 });

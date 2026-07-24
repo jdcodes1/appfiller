@@ -6,5 +6,18 @@
   <div class="add"><input id="newkey" placeholder="key (e.g. gender)"><input id="newval" placeholder="value (e.g. Male)"><button id="add">Add</button></div>
   <h2>Learned field mappings</h2>
   <table id="maps"><thead><tr><th>Field (label|type)</th><th>→ Data key</th><th></th></tr></thead><tbody></tbody></table>
-  <script src="options.js"></script>
+
+  <h2>Backup</h2>
+  <div class="backup">
+    <div class="backup-actions">
+      <button id="export">Export</button>
+      <label class="file-btn">Import<input type="file" id="import" accept="application/json" hidden></label>
+      <button id="linkFile">Link backup file…</button>
+      <button id="backupNow">Back up now</button>
+    </div>
+    <p id="linkStatus" class="status"></p>
+    <p id="backupStatus" class="status"></p>
+  </div>
+
+  <script type="module" src="options.js"></script>
 </body>

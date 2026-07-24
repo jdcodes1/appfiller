@@ -3,9 +3,11 @@
   "name": "AppFiller",
   "version": "0.1.0",
   "description": "Teach-once auto-fill for job application fields (EEO/diversity + custom data).",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAohE/TfddO/OC0lOG2MqsGxrwbnaRauLcIJjTGOfpC5J5HVRA22sc7FUDsG+q74Ew61EimCGlB4l4P5xhAWkfcxpvbqz6yri00T3hZ/xHoeQoAGRX6h2IYc1QP/+K0FEbZX7eydx8E5K0SiZjAn347tF6++uqJj554/aU61GrrCs4nl3bDiPqb6vWQX/6TAh4wxplHYDNMKGO5MZyFrXhsvTBwfCPIi7GloHxK/ppz+cQMVls2S85AflLof2e5gGI16KmKluZZpHZbyaCXFn61d/8wvOxt7tE2pSg31TA5l/zEUCjkJfumMEnrTKVoODod/Og+7c3AZC+Nkpd4EnEaQIDAQAB",
   "permissions": ["storage", "activeTab"],
   "action": { "default_popup": "src/popup.html", "default_title": "AppFiller" },
   "options_page": "src/options.html",
+  "background": { "service_worker": "src/background.js", "type": "module" },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
