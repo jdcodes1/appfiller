@@ -31,6 +31,26 @@ export async function openAndWaitReal(controlEl, wait = (ms) => new Promise(r =>
   return opts;
 }
 
+// True when the control already holds the intended value. Lets repeat passes be
+// idempotent — critical for dropdowns, where a redundant click would re-open the
+// menu and leave it hanging open.
+export function alreadyHasValue(el, type, value) {
+  const v = (value || '').toLowerCase().trim();
+  if (!v) return false;
+  if (type === 'text' || type === 'textarea') {
+    return (el.value || '').trim() === (value || '').trim();
+  }
+  if (type === 'select') {
+    const opt = el.options[el.selectedIndex];
+    return !!opt && opt.textContent.toLowerCase().trim() === v;
+  }
+  if (type === 'dropdown') {
+    return (el.textContent || '').toLowerCase().includes(v);
+  }
+  // radio/checkbox fills are cheap and idempotent; always re-apply.
+  return false;
+}
+
 export async function fillPage(doc, state, deps = F) {
   const { values, mappings } = state;
   const openAndWait = deps.openAndWait || ((el) => openAndWaitReal(el));
@@ -43,6 +63,7 @@ export async function fillPage(doc, state, deps = F) {
       if (!valueKey || !(valueKey in values)) continue;
       const value = values[valueKey];
       const type = getFieldType(el);
+      if (alreadyHasValue(el, type, value)) { filled++; continue; }
       let ok = false;
       if (type === 'text' || type === 'textarea') { deps.setNativeValue(el, value); ok = true; }
       else if (type === 'select') ok = deps.fillSelect(el, value);
@@ -55,6 +76,21 @@ export async function fillPage(doc, state, deps = F) {
     }
   }
   return { filled, total: fields.length };
+}
+
+// Auto-fill on load runs several passes. A single pass at document_idle often
+// lands before a React/SPA form finishes mounting, and the app's first render
+// then wipes what we wrote. Later passes restore it; alreadyHasValue keeps each
+// pass idempotent so settled fields are left alone.
+export async function autoFillWithRetries(doc, getState, opts = {}) {
+  const delays = opts.delays || [0, 600, 1500, 3000];
+  const wait = opts.wait || ((ms) => new Promise((r) => setTimeout(r, ms)));
+  let last = { filled: 0, total: 0 };
+  for (const d of delays) {
+    await wait(d);
+    last = await fillPage(doc, await getState(), opts.deps);
+  }
+  return last;
 }
 
 export function buildTeachPanel(doc, { labelText, valueKeys }) {
@@ -188,7 +224,13 @@ if (typeof chrome !== 'undefined' && chrome.storage) {
     if (msg.action === 'stopTeach') { window.__appfillerStopTeach?.(); sendResponse({ ok: true }); return false; }
   });
 
-  store.getSettings().then(s => { if (s.autoFillOnLoad) runFill(); });
+  store.getSettings().then(s => {
+    if (!s.autoFillOnLoad) return;
+    autoFillWithRetries(document, async () => ({
+      values: await store.getValues(),
+      mappings: await store.getMappings(),
+    }));
+  });
 
   const teach = teachController(document, store, async (el, valueKey, value) => {
     const state = { values: await store.getValues(), mappings: await store.getMappings() };

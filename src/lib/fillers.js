@@ -24,7 +24,14 @@ export function setNativeValue(el, value) {
     ? win.HTMLTextAreaElement.prototype
     : win.HTMLInputElement.prototype;
   const setter = Object.getOwnPropertyDescriptor(proto, 'value').set;
+  const previous = el.value;
   setter.call(el, value);
+  // React keeps a _valueTracker holding the last value it rendered. If it still
+  // matches what we just wrote, React treats the input event as a no-op and
+  // reverts the field on its next render. Force it stale with the old value so
+  // React's change plugin registers a real change and updates its state.
+  const tracker = el._valueTracker;
+  if (tracker && typeof tracker.setValue === 'function') tracker.setValue(previous);
   fire(el, 'input');
   fire(el, 'change');
 }
