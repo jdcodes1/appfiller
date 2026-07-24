@@ -1,23 +1,50 @@
 {
   "manifest_version": 3,
   "name": "AppFiller",
-  "version": "0.1.0",
-  "description": "Teach-once auto-fill for job application fields (EEO/diversity + custom data).",
+  "version": "0.2.0",
+  "description": "Save-once auto-fill for job applications: click the save icon next to any field to bank its value under an auto-generated key.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAohE/TfddO/OC0lOG2MqsGxrwbnaRauLcIJjTGOfpC5J5HVRA22sc7FUDsG+q74Ew61EimCGlB4l4P5xhAWkfcxpvbqz6yri00T3hZ/xHoeQoAGRX6h2IYc1QP/+K0FEbZX7eydx8E5K0SiZjAn347tF6++uqJj554/aU61GrrCs4nl3bDiPqb6vWQX/6TAh4wxplHYDNMKGO5MZyFrXhsvTBwfCPIi7GloHxK/ppz+cQMVls2S85AflLof2e5gGI16KmKluZZpHZbyaCXFn61d/8wvOxt7tE2pSg31TA5l/zEUCjkJfumMEnrTKVoODod/Og+7c3AZC+Nkpd4EnEaQIDAQAB",
-  "permissions": ["storage", "activeTab"],
-  "action": { "default_popup": "src/popup.html", "default_title": "AppFiller" },
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "action": {
+    "default_popup": "src/popup.html",
+    "default_title": "AppFiller"
+  },
   "options_page": "src/options.html",
-  "background": { "service_worker": "src/background.js", "type": "module" },
+  "background": {
+    "service_worker": "src/background.js",
+    "type": "module"
+  },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["src/content-loader.js"],
-      "css": ["src/content.css"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "src/content-loader.js"
+      ],
+      "css": [
+        "src/content.css"
+      ],
       "run_at": "document_idle"
     }
   ],
   "web_accessible_resources": [
-    { "resources": ["src/content.js", "src/lib/*.js"], "matches": ["<all_urls>"] }
+    {
+      "resources": [
+        "src/content.js",
+        "src/lib/*.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
   ],
-  "icons": { "16": "icons/icon16.png", "48": "icons/icon48.png", "128": "icons/icon128.png" }
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
 }
