@@ -36,7 +36,7 @@ export async function openAndWaitReal(controlEl, searchText, wait = (ms) => new 
     }
     return opts;
   }
-  controlEl.focus();
+  controlEl.focus({ preventScroll: true });
   // Typing filters long/async option lists (locations, schools) down to
   // something clickable — but search boxes often reject the full stored text
   // ("New York City, New York, United States" finds nothing on Ashby), so fall
@@ -114,7 +114,27 @@ export async function fillPage(doc, state, deps = F) {
       else if (type === 'select') ok = deps.fillSelect(el, value);
       else if (type === 'radio') ok = deps.fillRadio(el, value);
       else if (type === 'checkbox') ok = deps.fillCheckbox(el, value);
-      else if (type === 'dropdown') ok = await deps.fillDropdown(el, value, { openAndWait });
+      else if (type === 'dropdown') {
+        // Dropdown libraries focus their input / scrollIntoView their menu,
+        // yanking the viewport. Pin the scroll position for the duration:
+        // re-scrolling inside the scroll event lands before paint, so the page
+        // never visibly moves. scroll-behavior:auto kills smooth animation.
+        const win = doc.defaultView;
+        const root = doc.documentElement;
+        const sx = win ? win.scrollX : 0, sy = win ? win.scrollY : 0;
+        const prevBehavior = root.style.scrollBehavior;
+        const lock = () => { if (win.scrollX !== sx || win.scrollY !== sy) win.scrollTo(sx, sy); };
+        if (win) { root.style.scrollBehavior = 'auto'; win.addEventListener('scroll', lock); }
+        try {
+          ok = await deps.fillDropdown(el, value, { openAndWait });
+        } finally {
+          if (win) {
+            lock();
+            win.removeEventListener('scroll', lock);
+            root.style.scrollBehavior = prevBehavior;
+          }
+        }
+      }
       if (ok) filled++;
     } catch (e) {
       console.warn('[AppFiller] failed to fill field', el, e);

@@ -105,7 +105,9 @@ export function createSaveIcons(doc, store, { collectFields, onSaved } = {}) {
     if (rect.width === 0 && rect.height === 0) { btn.style.display = 'none'; return; }
     btn.style.display = 'flex';
     btn.style.top = (rect.top + win.scrollY + Math.max(0, (rect.height - 22) / 2)) + 'px';
-    btn.style.left = (rect.right + win.scrollX + 6) + 'px';
+    // Left of the field with a small gap; full-width inputs leave no room on
+    // the right. Clamp so fields at the page edge don't push the icon offscreen.
+    btn.style.left = Math.max(win.scrollX + 2, rect.left + win.scrollX - 22 - 8) + 'px';
   }
 
   function repositionAll() {

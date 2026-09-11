@@ -5,3 +5,4 @@ key.pem
 
 # Personal data backup (EEO/diversity answers, LinkedIn, etc). NEVER commit.
 data/backup.json
+.DS_Store

@@ -113,3 +113,27 @@ test('keyboard-driven combobox (Ashby): click ignored, ArrowDown+Enter commits',
   assert.equal(committed, 'New York City');
   assert.equal(cb.getAttribute('aria-expanded'), 'false');
 });
+
+test('fillPage restores window scroll after a dropdown fill scrolls the page', async () => {
+  const d = dom(`
+    <label for="cb">School</label>
+    <div class="select__control"><input id="cb" role="combobox" value=""></div>`);
+  const win = d.defaultView;
+  let x = 0, y = 340;
+  Object.defineProperty(win, 'scrollX', { get: () => x, configurable: true });
+  Object.defineProperty(win, 'scrollY', { get: () => y, configurable: true });
+  win.scrollTo = (nx, ny) => { x = nx; y = ny; };
+  const state = { values: { school: 'Purdue University' }, mappings: { 'school|dropdown': 'school' } };
+  const res = await fillPage(d, state, {
+    ...F,
+    // Simulates the dropdown library yanking the viewport to the field.
+    fillDropdown: async () => {
+      y = 0;
+      win.dispatchEvent(new win.Event('scroll'));
+      assert.equal(y, 340); // pinned back immediately, before the next paint
+      return true;
+    },
+  });
+  assert.equal(res.filled, 1);
+  assert.equal(y, 340);
+});

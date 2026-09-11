@@ -120,3 +120,18 @@ test('no icon for a radio group when any option is already mapped', async () => 
   await icons.enable();
   assert.equal(d.querySelectorAll('.appfiller-save-icon').length, 0);
 });
+
+test('save icon sits left of its field; clamped at the page edge', async () => {
+  const d = dom(`
+    <label for="a">Alpha</label><input id="a" type="text">
+    <label for="b">Beta</label><input id="b" type="text">`);
+  const a = d.getElementById('a'), b = d.getElementById('b');
+  a.getBoundingClientRect = () => ({ top: 100, left: 200, right: 500, width: 300, height: 30 });
+  b.getBoundingClientRect = () => ({ top: 200, left: 10, right: 310, width: 300, height: 30 });
+  const icons = createSaveIcons(d, memStore(), { collectFields });
+  await icons.enable();
+  const byField = new Map([...icons._icons.values()].map(({ btn, field }) => [field.id, btn]));
+  assert.equal(byField.get('a').style.left, '170px'); // 200 - 22 icon - 8 gap
+  assert.equal(byField.get('a').style.top, '104px');  // vertically centered
+  assert.equal(byField.get('b').style.left, '2px');   // clamped, not offscreen
+});
