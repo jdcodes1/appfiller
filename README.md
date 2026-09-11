@@ -2,6 +2,8 @@
 
 Save-once auto-fill for job applications (Greenhouse, Ashby, and anything with standard form controls). Fill an application by hand once, click the 💾 icons to bank each answer, and every future application fills itself.
 
+![AppFiller filling a job application, with 💾 save icons next to unfilled fields and the popup showing Filled 3/6](docs/screenshot.png)
+
 ## Install (dev)
 1. `npm install`
 2. `chrome://extensions` → enable Developer mode → **Load unpacked** → select this folder.
